@@ -1,0 +1,7 @@
+Parameter	Classical_Coefficient	Classical_CI95_Lower	Classical_CI95_Upper	Bayesian_Mean	Bayesian_HPD95_Lower	Bayesian_HPD95_Upper
+Intercept	-0.2984	-2.8482	2.2514	-0.073	-0.2229	-0.1138
+R0_min	0.839	-2.973	4.651	0.9283	0.883	0.9791
+infectious_period_average_days	-0.1235	-0.649	0.402	-0.2074	-0.1799	-0.1579
+lethality_rate	-0.2321	-9.6871	9.2228	-0.2288	-0.292	-0.171
+incubation_period_days_min	0.1195	-1.3572	1.5961	0.2961	0.1786	0.2412
+permanent_immunity	-0.0	-2.5498	2.5498	-0.0706	-0.163	-0.0529

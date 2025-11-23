@@ -1,0 +1,26 @@
+
+
+Variable: permanent_immunity
+Chi-squared statistic: 0.0000
+P-value: 1.0000
+Degrees of freedom: 1
+Contingency Table:
+pandemic            0  1
+permanent_immunity      
+0                   2  1
+1                   5  6
+
+==================================================
+
+Variable: approved_vaccine
+Chi-squared statistic: 1.1429
+P-value: 0.2850
+Degrees of freedom: 1
+Contingency Table:
+pandemic          0  1
+approved_vaccine      
+0                 5  2
+1                 2  5
+
+==================================================
+
