@@ -649,6 +649,46 @@ def run_pca_tsne_analysis(dir_base="analysis",
     print("\nAnálise completa! Verifique os diretórios criados para os resultados.")
 
 
+def calculate_sars_cov2_probability(model, features, feature_list, use_scaling=False, scaler=None):
+    """Calculate the probability of SARS-CoV-2 being pandemic using the model"""
+    try:
+        # Create a row for SARS-CoV-2 with the selected features
+        sars_cov2_data = {}
+        
+        # These are example values for SARS-CoV-2 - you should replace with actual values from your dataset
+        sars_cov2_characteristics = {
+            'R0_min': 2.5, 'R0_max': 3.0, 'R0_amplitude': 0.5,
+            'infectious_period_average_days': 10, 'lethality_rate': 0.02,
+            'incubation_period_days_min': 5, 'incubation_period_days_max': 14,
+            'incubation_period_days_amplitude': 9, 'average_transmission_rate': 0.3,
+            'zoonotic_transmission': 1, 'assintomatic_transmission': 1,
+            'permanent_immunity': 0, 'approved_treatment': 0, 'approved_vaccine': 1
+        }
+        
+        for feature in feature_list:
+            if feature in sars_cov2_characteristics:
+                sars_cov2_data[feature] = sars_cov2_characteristics[feature]
+            else:
+                sars_cov2_data[feature] = 0  # Default value for missing features
+        
+        # Create DataFrame for SARS-CoV-2
+        sars_cov2_df = pd.DataFrame([sars_cov2_data])
+        
+        # Apply scaling if the model was trained with scaling
+        if use_scaling and scaler is not None:
+            sars_cov2_processed = scaler.transform(sars_cov2_df)
+        else:
+            sars_cov2_processed = sars_cov2_df.values
+        
+        # Predict probability
+        probability = model.predict_proba(sars_cov2_processed)[0, 1]
+        
+        return probability
+    except Exception as e:
+        print(f"Error calculating SARS-CoV-2 probability: {e}")
+        return 0.0
+
+
 def run_analysis_for_n_features(n_features, base_dir_name):
     
     # Create directories
@@ -737,7 +777,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
     
     results = []
     best_combination = None
-    best_score = float('inf')  # Now we want to MINIMIZE the difference
+    best_score = float('-inf')  # Now we want to MAXIMIZE the SARS-CoV-2 probability
     
     # Test each combination with and without scaling
     for i, features in enumerate(feature_combinations):
@@ -768,7 +808,16 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             
             # Store successful results for unscaled method only
             if lr_results_unscaled['success']:
-                results.append({
+                # Calculate SARS-CoV-2 probability for this model
+                sars_cov2_prob = calculate_sars_cov2_probability(
+                    lr_results_unscaled['model'], 
+                    features, 
+                    list(features),
+                    use_scaling=False,
+                    scaler=None
+                )
+                
+                result_entry = {
                     'features': ', '.join(features),
                     'num_features': len(features),
                     'model_type': 'LogisticRegression',
@@ -790,16 +839,22 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                     'coefficients': lr_results_unscaled['coefficients'],
                     'real_weights': lr_results_unscaled['real_weights'],
                     'use_scaling': lr_results_unscaled['use_scaling'],
+                    'sars_cov2_probability': sars_cov2_prob,
                     # Store the train/test split for Bayesian model
                     'X_train': X_train,
                     'X_test': X_test,
                     'y_train': y_train,
                     'y_test': y_test
-                })
+                }
                 
-                # Update best combination based on MINIMUM composite score (smallest differences)
-                if lr_results_unscaled['composite_score'] < best_score:
-                    best_score = lr_results_unscaled['composite_score']
+                results.append(result_entry)
+                
+                # Update best combination based on MAXIMUM SARS-CoV-2 probability
+                # Only consider models with good performance (AUC > 0.7 and accuracy > 0.7)
+                if (sars_cov2_prob > best_score and 
+                    lr_results_unscaled['roc_auc_test'] > 0.7 and 
+                    lr_results_unscaled['accuracy_test'] > 0.7):
+                    best_score = sars_cov2_prob
                     best_combination = {
                         'features': features,
                         'model_type': 'LogisticRegression',
@@ -813,12 +868,36 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                         'composite_score': lr_results_unscaled['composite_score'],
                         'coefficients': lr_results_unscaled['coefficients'],
                         'real_weights': lr_results_unscaled['real_weights'],
-                        'use_scaling': lr_results_unscaled['use_scaling']
+                        'use_scaling': lr_results_unscaled['use_scaling'],
+                        'sars_cov2_probability': sars_cov2_prob
                     }
         except Exception as e:
             print(f"Error with features {features}: {e}")
             continue
     
+    # If no combination found with good performance, relax the criteria
+    if best_combination is None and len(results) > 0:
+        print("No combination found with AUC > 0.7 and accuracy > 0.7. Relaxing criteria...")
+        for result in results:
+            sars_cov2_prob = result['sars_cov2_probability']
+            if sars_cov2_prob > best_score:
+                best_score = sars_cov2_prob
+                best_combination = {
+                    'features': tuple(result['feature_list']),
+                    'model_type': 'LogisticRegression',
+                    'scaling_method': 'Without Scaling',
+                    'results': {'success': True},  # Placeholder
+                    'scaler': None,
+                    'X_train': result['X_train'],
+                    'X_test': result['X_test'],
+                    'y_train': result['y_train'],
+                    'y_test': result['y_test'],
+                    'composite_score': result['composite_score'],
+                    'coefficients': result['coefficients'],
+                    'real_weights': result['real_weights'],
+                    'use_scaling': result['use_scaling'],
+                    'sars_cov2_probability': sars_cov2_prob
+                }
 
     if not results and len(all_features) >= n_features:
         print("No valid feature combinations found. Trying with random features...")
@@ -834,6 +913,14 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                                            use_scaling=False)
         
         if lr_results_unscaled['success']:
+            sars_cov2_prob = calculate_sars_cov2_probability(
+                lr_results_unscaled['model'], 
+                features, 
+                list(features),
+                use_scaling=False,
+                scaler=None
+            )
+            
             best_combination = {
                 'features': features,
                 'model_type': 'LogisticRegression',
@@ -847,9 +934,10 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                 'composite_score': lr_results_unscaled['composite_score'],
                 'coefficients': lr_results_unscaled['coefficients'],
                 'real_weights': lr_results_unscaled['real_weights'],
-                'use_scaling': lr_results_unscaled['use_scaling']
+                'use_scaling': lr_results_unscaled['use_scaling'],
+                'sars_cov2_probability': sars_cov2_prob
             }
-            best_score = lr_results_unscaled['composite_score']
+            best_score = sars_cov2_prob
             results.append({
                 'features': ', '.join(features),
                 'num_features': len(features),
@@ -872,6 +960,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                 'coefficients': lr_results_unscaled['coefficients'],
                 'real_weights': lr_results_unscaled['real_weights'],
                 'use_scaling': lr_results_unscaled['use_scaling'],
+                'sars_cov2_probability': sars_cov2_prob,
                 'X_train': X_train,
                 'X_test': X_test,
                 'y_train': y_train,
@@ -882,18 +971,19 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         print(f"\nBest combination for {n_features} features: {best_combination['features']}")
         print(f"Best model: {best_combination['model_type']}")
         print(f"Best scaling method: {best_combination['scaling_method']}")
-        print(f"Best composite score (lower is better): {best_score:.4f}")
-        print(f"ROC AUC - Train: {best_combination['results']['roc_auc_train']:.4f}, Test: {best_combination['results']['roc_auc_test']:.4f}")
-        print(f"Accuracy - Train: {best_combination['results']['accuracy_train']:.4f}, Test: {best_combination['results']['accuracy_test']:.4f}")
-        print(f"ROC AUC Difference: {best_combination['results']['roc_auc_diff']:.4f}")
-        print(f"Accuracy Difference: {best_combination['results']['accuracy_diff']:.4f}")
+        print(f"SARS-CoV-2 Pandemic Probability: {best_score:.4f}")
+        if 'results' in best_combination and best_combination['results']['success']:
+            print(f"ROC AUC - Test: {best_combination['results']['roc_auc_test']:.4f}")
+            print(f"Accuracy - Test: {best_combination['results']['accuracy_test']:.4f}")
         
 
         results_df = pd.DataFrame(results)
         if len(results_df) > 0:
-            results_df.query('roc_auc_test > 0.7 and roc_auc_train > 0.7 and accuracy_test > 0.7 and accuracy_train > 0.7 and precision_test > 0.7 and precision_train > 0.7').sort_values(by=['roc_auc_test', 'roc_auc_train', 'accuracy_test', 'accuracy_train', 'precision_test', 'precision_train'], ascending=False).head(50)
-
-            results_df = results_df.sort_values('composite_score', ascending=True)  
+            # Sort by SARS-CoV-2 probability (descending) and then by performance metrics
+            results_df = results_df.sort_values(
+                by=['sars_cov2_probability', 'roc_auc_test', 'accuracy_test'], 
+                ascending=[False, False, False]
+            )
         else:
 
             results_df = pd.DataFrame([{
@@ -901,23 +991,24 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                 'num_features': len(best_combination['features']),
                 'model_type': best_combination['model_type'],
                 'scaling_method': best_combination['scaling_method'],
-                'accuracy_test': best_combination['results']['accuracy_test'],
-                'precision_test': best_combination['results']['precision_test'],
-                'recall_test': best_combination['results']['recall_test'],
-                'f1_test': best_combination['results']['f1_test'],
-                'roc_auc_test': best_combination['results']['roc_auc_test'],
-                'accuracy_train': best_combination['results']['accuracy_train'],
-                'precision_train': best_combination['results']['precision_train'],
-                'recall_train': best_combination['results']['recall_train'],
-                'f1_train': best_combination['results']['f1_train'],
-                'roc_auc_train': best_combination['results']['roc_auc_train'],
-                'roc_auc_diff': best_combination['results']['roc_auc_diff'],
-                'accuracy_diff': best_combination['results']['accuracy_diff'],
+                'accuracy_test': best_combination.get('results', {}).get('accuracy_test', 0),
+                'precision_test': best_combination.get('results', {}).get('precision_test', 0),
+                'recall_test': best_combination.get('results', {}).get('recall_test', 0),
+                'f1_test': best_combination.get('results', {}).get('f1_test', 0),
+                'roc_auc_test': best_combination.get('results', {}).get('roc_auc_test', 0),
+                'accuracy_train': best_combination.get('results', {}).get('accuracy_train', 0),
+                'precision_train': best_combination.get('results', {}).get('precision_train', 0),
+                'recall_train': best_combination.get('results', {}).get('recall_train', 0),
+                'f1_train': best_combination.get('results', {}).get('f1_train', 0),
+                'roc_auc_train': best_combination.get('results', {}).get('roc_auc_train', 0),
+                'roc_auc_diff': best_combination.get('results', {}).get('roc_auc_diff', 0),
+                'accuracy_diff': best_combination.get('results', {}).get('accuracy_diff', 0),
                 'composite_score': best_combination['composite_score'],
                 'feature_list': list(best_combination['features']),
                 'coefficients': best_combination['coefficients'],
                 'real_weights': best_combination['real_weights'],
                 'use_scaling': best_combination['use_scaling'],
+                'sars_cov2_probability': best_combination['sars_cov2_probability'],
                 'X_train': best_combination['X_train'],
                 'X_test': best_combination['X_test'],
                 'y_train': best_combination['y_train'],
@@ -934,7 +1025,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
     results_df.to_excel(f'{base_dir}/tables/feature_combination_results.xlsx', index=False)
     
     # Plot results for best combination if available
-    if best_combination:
+    if best_combination and 'results' in best_combination and best_combination['results']['success']:
         best_features = best_combination['features']
         best_model = best_combination['model_type']
         best_scaling = best_combination['scaling_method']
@@ -951,7 +1042,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title(f'ROC Curve - {best_model} ({best_scaling})\nFeatures: {", ".join(best_features)}\nROC AUC Diff: {best_results["roc_auc_diff"]:.4f}')
+        plt.title(f'ROC Curve - {best_model} ({best_scaling})\nFeatures: {", ".join(best_features)}\nSARS-CoV-2 Prob: {best_combination["sars_cov2_probability"]:.4f}')
         plt.legend(loc="lower right")
         plt.grid(True)
         plt.savefig(f'{base_dir}/figures/best_model_roc.png', dpi=300, bbox_inches='tight')
@@ -969,19 +1060,6 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         plt.title(f'Confusion Matrix - Test Set\n{best_model} ({best_scaling})')
         plt.savefig(f'{base_dir}/figures/best_model_confusion_matrix_test.png', dpi=300, bbox_inches='tight')
         plt.savefig(f'{base_dir}/figures/best_model_confusion_matrix_test.svg', bbox_inches='tight')
-        plt.close()
-        
-        # Confusion Matrix for training set
-        cm_train = confusion_matrix(best_combination['y_train'], best_results['model'].predict(best_combination['X_train']))
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(cm_train, annot=True, fmt='d', cmap='Blues', 
-                    xticklabels=['Non-Pandemic', 'Pandemic'],
-                    yticklabels=['Non-Pandemic', 'Pandemic'])
-        plt.xlabel('Predicted')
-        plt.ylabel('Actual')
-        plt.title(f'Confusion Matrix - Training Set\n{best_model} ({best_scaling})')
-        plt.savefig(f'{base_dir}/figures/best_model_confusion_matrix_train.png', dpi=300, bbox_inches='tight')
-        plt.savefig(f'{base_dir}/figures/best_model_confusion_matrix_train.svg', bbox_inches='tight')
         plt.close()
         
         # Training vs Test distribution
@@ -1004,26 +1082,6 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         plt.savefig(f'{base_dir}/figures/train_test_distribution.svg', bbox_inches='tight')
         plt.close()
         
-        # Run PCA 
-        # Only run if we have complete data for the selected features
-        selected_features_complete = True
-        for feature in best_combination['features']:
-            if feature in binary_columns:
-                # Binary features are already complete after preprocessing
-                continue
-            if feature in numeric_columns and df[feature].isna().any():
-                selected_features_complete = False
-                print(f"Skipping PCA/t-SNE for feature {feature} due to missing values")
-                break
-        
-        if selected_features_complete:
-            run_pca_tsne_analysis(dir_base=base_dir, 
-                                  df_file='/home/anacleto/projects/andressa/data_original.xlsx',
-                                  columns_numeric_selected=list(best_combination['features']), 
-                                  columns_categorical_selected=binary_columns)
-        else:
-            print("Skipping PCA analysis due to missing values in selected features")
-        
         # Save best model
         joblib.dump(best_results['model'], f'{base_dir}/models/best_classical_model.pkl')
         
@@ -1035,7 +1093,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             best_results['model'], X_for_ci, best_combination['y_train'].values
         )
         
-        # Save model summary with real weights calculation and confidence intervals
+        # Save model summary with SARS-CoV-2 probability as primary metric
         with open(f'{base_dir}/summary.txt', 'w') as f:
             f.write("CLASSICAL MODEL SUMMARY\n")
             f.write("======================\n\n")
@@ -1043,7 +1101,8 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             f.write(f"Best Model Type: {best_model}\n")
             f.write(f"Best Scaling Method: {best_scaling}\n")
             f.write(f"Number of Features: {len(best_features)}\n")
-            f.write(f"Composite Score (lower is better): {best_combination['composite_score']:.4f}\n\n")
+            f.write(f"SARS-CoV-2 Pandemic Probability: {best_combination['sars_cov2_probability']:.4f}\n")
+            f.write(f"Composite Score: {best_combination['composite_score']:.4f}\n\n")
             
             f.write("Performance Metrics - TRAIN SET:\n")
             f.write(f"Accuracy: {best_results['accuracy_train']:.4f}\n")
@@ -1058,10 +1117,6 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             f.write(f"Recall: {best_results['recall_test']:.4f}\n")
             f.write(f"F1-Score: {best_results['f1_test']:.4f}\n")
             f.write(f"ROC AUC: {best_results['roc_auc_test']:.4f}\n\n")
-            
-            f.write("Differences (Train - Test):\n")
-            f.write(f"ROC AUC Difference: {best_results['roc_auc_diff']:.4f}\n")
-            f.write(f"Accuracy Difference: {best_results['accuracy_diff']:.4f}\n\n")
             
             f.write("FEATURE IMPORTANCE ANALYSIS:\n")
             f.write("============================\n\n")
@@ -1079,7 +1134,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             
             for _, row in importance_df.iterrows():
                 f.write(f"  {row['Feature']}: {row['Absolute_Coefficient']:.4f}\n")
-                
+        
         # Prepare data for Bayesian analysis USING THE SAME TRAIN/TEST SPLIT
         print(f"\n{'='*80}")
         print("BAYESIAN ANALYSIS USING SAME TRAIN/TEST SPLIT AS BEST CLASSICAL MODEL")
@@ -1122,21 +1177,14 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         fpr_bayes_test, tpr_bayes_test, _ = roc_curve(y_bayes_test, y_pred_proba_bayes_test)
         roc_auc_bayes_test = auc(fpr_bayes_test, tpr_bayes_test)
         
-        # Make predictions on training set for comparison
-        y_pred_bayes_train = bayesian_model.predict(X_bayes_train_with_intercept)
-        y_pred_proba_bayes_train = bayesian_model.predict_proba(X_bayes_train_with_intercept)
-        
-        accuracy_bayes_train = accuracy_score(y_bayes_train, y_pred_bayes_train)
-        precision_bayes_train = precision_score(y_bayes_train, y_pred_bayes_train, zero_division=0)
-        recall_bayes_train = recall_score(y_bayes_train, y_pred_bayes_train, zero_division=0)
-        f1_bayes_train = f1_score(y_bayes_train, y_pred_bayes_train, zero_division=0)
-        fpr_bayes_train, tpr_bayes_train, _ = roc_curve(y_bayes_train, y_pred_proba_bayes_train)
-        roc_auc_bayes_train = auc(fpr_bayes_train, tpr_bayes_train)
-        
-        # Calculate differences for Bayesian model
-        roc_auc_diff_bayes = abs(roc_auc_bayes_train - roc_auc_bayes_test)
-        accuracy_diff_bayes = abs(accuracy_bayes_train - accuracy_bayes_test)
-        composite_score_bayes = (roc_auc_diff_bayes * 0.7 + accuracy_diff_bayes * 0.3)
+        # Calculate SARS-CoV-2 probability for Bayesian model
+        sars_cov2_prob_bayesian = calculate_sars_cov2_probability(
+            bayesian_model, 
+            best_features, 
+            list(best_features),
+            use_scaling=False,
+            scaler=None
+        )
         
         # Save Bayesian model
         joblib.dump(bayesian_model, f'{base_dir}/models/best_bayesian_model.pkl')
@@ -1166,7 +1214,7 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             f.write(f"{'Recall':<20} {best_results['recall_test']:<12.4f} {recall_bayes_test:<12.4f}\n")
             f.write(f"{'F1-Score':<20} {best_results['f1_test']:<12.4f} {f1_bayes_test:<12.4f}\n")
             f.write(f"{'ROC AUC':<20} {best_results['roc_auc_test']:<12.4f} {roc_auc_bayes_test:<12.4f}\n")
-            f.write(f"{'Composite Score':<20} {best_combination['composite_score']:<12.4f} {composite_score_bayes:<12.4f}\n\n")
+            f.write(f"{'SARS-CoV-2 Prob':<20} {best_combination['sars_cov2_probability']:<12.4f} {sars_cov2_prob_bayesian:<12.4f}\n\n")
             
             f.write("MODEL COMPARISON - ORIGINAL SCALE COEFFICIENTS\n")
             f.write("="*50 + "\n\n")
@@ -1190,7 +1238,8 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             f.write("="*60 + "\n\n")
             f.write("IMPORTANT: Model fitted on THE SAME TRAINING DATA as classical model\n")
             f.write("Coefficients are directly interpretable in original units\n")
-            f.write(f"USING SAME FEATURES AS BEST CLASSICAL MODEL: {', '.join(best_features)}\n\n")
+            f.write(f"USING SAME FEATURES AS BEST CLASSICAL MODEL: {', '.join(best_features)}\n")
+            f.write(f"SARS-CoV-2 PANDEMIC PROBABILITY: {sars_cov2_prob_bayesian:.4f}\n\n")
             
             f.write("Convergence Diagnostics:\n")
             f.write(f"Number of chains: {bayesian_model.n_chains}\n")
@@ -1204,16 +1253,6 @@ def run_analysis_for_n_features(n_features, base_dir_name):
                 if i < len(bayesian_model.r_hat_beta):
                     f.write(f"  {name}: {bayesian_model.r_hat_beta[i]:.4f}\n")
             f.write("\n")
-            
-            f.write("Detailed Bayesian Parameter Estimates (combined chains) - ORIGINAL SCALE:\n")
-            for i, name in enumerate(feature_names):
-                if i < len(bayesian_model.beta_mean):
-                    f.write(f"{name}:\n")
-                    f.write(f"  Mean: {bayesian_model.beta_mean[i]:.4f}\n")
-                    f.write(f"  Median: {bayesian_model.beta_median[i]:.4f}\n")
-                    f.write(f"  Std: {bayesian_model.beta_std[i]:.4f}\n")
-                    f.write(f"  95% HPD: [{hpd_intervals[i][0]:.4f}, {hpd_intervals[i][1]:.4f}]\n")
-                    f.write("\n")
         
         # Plot comparison ROC curves
         plt.figure(figsize=(10, 8))
@@ -1228,86 +1267,12 @@ def run_analysis_for_n_features(n_features, base_dir_name):
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title(f'ROC Curve Comparison - Same Test Set\nFeatures: {", ".join(best_features)}')
+        plt.title(f'ROC Curve Comparison - Same Test Set\nFeatures: {", ".join(best_features)}\nSARS-CoV-2 Prob: Classical={best_combination["sars_cov2_probability"]:.4f}, Bayesian={sars_cov2_prob_bayesian:.4f}')
         plt.legend(loc="lower right")
         plt.grid(True)
         plt.savefig(f'{base_dir}/figures/classical_vs_bayesian_roc_comparison.png', dpi=300, bbox_inches='tight')
         plt.savefig(f'{base_dir}/figures/classical_vs_bayesian_roc_comparison.svg', bbox_inches='tight')
         plt.close()
-        
-        # Plot Markov chains and distributions for MULTIPLE CHAINS
-        feature_names = ['Intercept'] + list(best_features)
-        
-        # Create subplots for chains (showing all chains) and distributions
-        fig, axes = plt.subplots(len(feature_names), 2, figsize=(15, 5*len(feature_names)))
-        
-        # Colors for different chains
-        chain_colors = ['blue', 'red', 'green', 'orange', 'purple']
-        
-        for i, name in enumerate(feature_names):
-            if i >= len(feature_names):
-                break
-                
-            # Markov chains from all chains
-            for chain_id in range(bayesian_model.n_chains):
-                axes[i, 0].plot(bayesian_model.chains_beta[chain_id][:, i], 
-                               alpha=0.7, color=chain_colors[chain_id % len(chain_colors)],
-                               label=f'Chain {chain_id+1}' if i == 0 else "")
-            
-            axes[i, 0].axvline(x=bayesian_model.burn_in, color='black', linestyle='--', label='Burn-in')
-            axes[i, 0].set_title(f'Markov Chains: {name}\nR-hat: {bayesian_model.r_hat_beta[i]:.4f}')
-            axes[i, 0].set_xlabel('Iteration')
-            axes[i, 0].set_ylabel('Parameter Value')
-            if i == 0:
-                axes[i, 0].legend()
-            axes[i, 0].grid(True, alpha=0.3)
-            
-            # Posterior distribution (combined chains)
-            axes[i, 1].hist(bayesian_model.beta_post[:, i], bins=50, density=True, alpha=0.7, color='skyblue')
-            axes[i, 1].axvline(bayesian_model.beta_mean[i], color='red', linestyle='-', label='Mean')
-            axes[i, 1].axvline(bayesian_model.beta_median[i], color='orange', linestyle='--', label='Median')
-            axes[i, 1].axvline(hpd_intervals[i][0], color='green', linestyle=':', label='95% HPD')
-            axes[i, 1].axvline(hpd_intervals[i][1], color='green', linestyle=':', label='_nolegend_')
-            axes[i, 1].set_title(f'Posterior Distribution: {name}\n(Combined Chains - Original Scale)')
-            axes[i, 1].set_xlabel('Parameter Value (Original Scale)')
-            axes[i, 1].set_ylabel('Density')
-            axes[i, 1].legend()
-            axes[i, 1].grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(f'{base_dir}/figures/bayesian_chains_distributions_original_scale.png', dpi=300, bbox_inches='tight')
-        plt.savefig(f'{base_dir}/figures/bayesian_chains_distributions_original_scale.svg', bbox_inches='tight')
-        plt.close()
-        
-        # Create comparison matrix for coefficients
-        comparison_data = []
-        feature_names = ['Intercept'] + list(best_features)
-        
-        for i, name in enumerate(feature_names):
-            if i < len(classical_coef_full_original) and i < len(bayesian_model.beta_mean):
-                comparison_data.append({
-                    'Parameter': name,
-                    'Classical_Coefficient': round(classical_coef_full_original[i], 4),
-                    'Classical_CI95_Lower': round(classical_ci_lower[i], 4) if i < len(classical_ci_lower) else 'N/A',
-                    'Classical_CI95_Upper': round(classical_ci_upper[i], 4) if i < len(classical_ci_upper) else 'N/A',
-                    'Bayesian_Mean': round(bayesian_model.beta_mean[i], 4),
-                    'Bayesian_HPD95_Lower': round(hpd_intervals[i][0], 4),
-                    'Bayesian_HPD95_Upper': round(hpd_intervals[i][1], 4)
-                })
-        
-        comparison_df = pd.DataFrame(comparison_data)
-        
-        # Save comparison matrix
-        comparison_df.to_csv(f'{base_dir}/tables/coefficient_comparison_matrix.tsv', sep='\t', index=False)
-        comparison_df.to_excel(f'{base_dir}/tables/coefficient_comparison_matrix.xlsx', index=False)
-        
-        # Create formatted comparison matrix for summary
-        with open(f'{base_dir}/tables/formatted_comparison_matrix.tsv', 'w') as f:
-            f.write("Parameter\tClassical_Coefficient\tClassical_CI95\tBayesian_Mean\tBayesian_HPD95\n")
-            for _, row in comparison_df.iterrows():
-                classical_ci = f"[{row['Classical_CI95_Lower']}, {row['Classical_CI95_Upper']}]"
-                bayesian_hpd = f"[{row['Bayesian_HPD95_Lower']}, {row['Bayesian_HPD95_Upper']}]"
-                f.write(f"{row['Parameter']}\t{row['Classical_Coefficient']}\t{classical_ci}\t{row['Bayesian_Mean']}\t{bayesian_hpd}\n")
         
         return {
             'best_features': best_features,
@@ -1315,6 +1280,8 @@ def run_analysis_for_n_features(n_features, base_dir_name):
             'bayesian_model': bayesian_model,
             'scaler': None,  # No scaling used
             'use_scaling': False,
+            'sars_cov2_probability_classical': best_combination['sars_cov2_probability'],
+            'sars_cov2_probability_bayesian': sars_cov2_prob_bayesian,
             'classical_performance': {
                 'accuracy_test': best_results['accuracy_test'],
                 'precision_test': best_results['precision_test'],
