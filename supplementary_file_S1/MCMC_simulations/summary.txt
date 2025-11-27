@@ -1,0 +1,100 @@
+FIXED FEATURES CLASSICAL MODEL SUMMARY
+=====================================
+
+Fixed Feature Combination: R0_min, infectious_period_average_days, lethality_rate, incubation_period_days_min
+Best Model Type: LogisticRegression
+Best Scaling Method: Without Scaling
+Number of Features: 4
+Composite Score (lower is better): 0.0417
+
+Performance Metrics - TRAIN SET:
+Accuracy: 0.7778
+Precision: 0.7143
+Recall: 1.0000
+F1-Score: 0.8333
+ROC AUC: 0.9500
+
+Performance Metrics - TEST SET:
+Accuracy: 0.8000
+Precision: 0.6667
+Recall: 1.0000
+F1-Score: 0.8000
+ROC AUC: 1.0000
+
+Differences (Train - Test):
+ROC AUC Difference: 0.0500
+Accuracy Difference: 0.0222
+
+FEATURE IMPORTANCE ANALYSIS:
+============================
+
+Model trained WITHOUT feature scaling
+Coefficients (on original features):
+  R0_min: 0.9664
+  infectious_period_average_days: -0.0627
+  lethality_rate: -0.2791
+  incubation_period_days_min: -0.0256
+
+Feature Importance Ranking (based on absolute coefficients):
+  R0_min: 0.9664
+  lethality_rate: 0.2791
+  infectious_period_average_days: 0.0627
+  incubation_period_days_min: 0.0256
+
+================================================================================
+COMPARISON: CLASSICAL vs BAYESIAN LOGISTIC REGRESSION
+USING THE SAME TRAIN/TEST SPLIT AND FIXED FEATURES
+================================================================================
+
+PERFORMANCE COMPARISON ON TEST SET
+========================================
+Metric               Classical    Bayesian    
+----------------------------------------
+Accuracy             0.8000       1.0000      
+Precision            0.6667       1.0000      
+Recall               1.0000       1.0000      
+F1-Score             0.8000       1.0000      
+ROC AUC              1.0000       1.0000      
+Composite Score      0.0417       0.1367      
+
+MODEL COMPARISON - ORIGINAL SCALE COEFFICIENTS
+==================================================
+
+Fixed features used in both models: R0_min, infectious_period_average_days, lethality_rate, incubation_period_days_min
+
+Parameter                 Classical Coef  Classical 95% CI          Bayesian Mean   Bayesian 95% HPD         
+----------------------------------------------------------------------------------------------------
+Intercept                        -0.6857 [-5.6503, 4.2788]                -0.2293 [-0.3197, -0.2141]       
+R0_min                            0.9664 [-2.6355, 4.5684]                 0.8904 [0.7922, 0.8815]         
+infectious_period_average_days        -0.0627 [-0.3790, 0.2535]                -0.1267 [-0.1157, -0.0977]       
+lethality_rate                   -0.2791 [-7.4827, 6.9244]                -0.3052 [-0.4651, -0.3443]       
+incubation_period_days_min        -0.0256 [-1.2453, 1.1940]                 0.1076 [0.0494, 0.1064]         
+
+
+NPPI (NOVO PANDEMIC POTENTIAL INDEX) CALCULATION
+============================================================
+
+NPPI = sigmoid(intercept + coef1*R0_min + coef2*infectious_period + coef3*lethality_rate + coef4*incubation_period)
+
+Classical NPPI coefficients:
+  intercept: -0.6857
+  R0_min: 0.9664
+  infectious_period_average_days: -0.0627
+  lethality_rate: -0.2791
+  incubation_period_days_min: -0.0256
+
+Bayesian NPPI coefficients:
+  intercept: -0.2293
+  R0_min: 0.8904
+  infectious_period_average_days: -0.1267
+  lethality_rate: -0.3052
+  incubation_period_days_min: 0.1076
+
+NPPI values saved to: /home/anacleto/projects/andressa/pandemic_potential_bayesian_algorithm/supplementary_file_S1/MCMC_simulations/tables/fixed_features_with_nppi.tsv
+File includes: original data + NPPI_classic + NPPI_bayesian
+
+Probability intervals saved to: /home/anacleto/projects/andressa/pandemic_potential_bayesian_algorithm/supplementary_file_S1/MCMC_simulations/tables/probability_intervals.tsv
+Includes: classical probabilities with CI95% and Bayesian probabilities with HPD95%
+
+Posterior predictive summary saved to: /home/anacleto/projects/andressa/pandemic_potential_bayesian_algorithm/supplementary_file_S1/MCMC_simulations/tables/posterior_predictive_summary.tsv
+Includes: mean probability and HPD intervals for each disease

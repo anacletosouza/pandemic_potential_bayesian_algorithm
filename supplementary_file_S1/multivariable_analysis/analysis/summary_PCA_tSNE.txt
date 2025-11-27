@@ -1,0 +1,40 @@
+
+
+PCA ANALYSIS SUMMARY
+==================================================
+Features used: ['R0_min', 'infectious_period_average_days', 'lethality_rate', 'incubation_period_days_min']
+Number of features: 4
+Original samples: 14
+Clean samples (after removing missing values): 14
+Explained variance by PC1: 48.86%
+Explained variance by PC2: 32.35%
+Total explained variance (PC1+PC2): 81.22%
+
+PCA Loadings (PC1):
+  R0_min: 0.603
+  infectious_period_average_days: 0.342
+  lethality_rate: -0.214
+  incubation_period_days_min: 0.688
+
+PCA Loadings (PC2):
+  R0_min: -0.304
+  infectious_period_average_days: 0.667
+  lethality_rate: 0.665
+  incubation_period_days_min: 0.141
+
+
+CORRELATION ANALYSIS FOR PANDEMIC POTENTIAL
+==================================================
+Variables correlated with pandemic status:
+                                correlation_with_pandemic
+lethality_rate                                  -0.420990
+R0_min                                           0.402468
+infectious_period_average_days                  -0.273489
+incubation_period_days_min                       0.158487
+
+SUMMARY STATISTICS BY PANDEMIC STATUS
+==================================================
+            R0_min  infectious_period_average_days  lethality_rate  incubation_period_days_min
+pandemic                                                                                      
+no        1.241429                       11.614286        0.300004                    2.800000
+yes       3.464286                        7.400000        0.110143                    3.828571

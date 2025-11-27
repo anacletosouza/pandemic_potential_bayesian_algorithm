@@ -1,0 +1,15 @@
+tSNE1	tSNE2	etiological_name	disease_name	pandemic
+86.45989	-45.65393	Orthopoxvirus variolae	Smallpox	yes
+123.97805	-28.291681	Morbillivirus	Measles	yes
+-72.7693	-25.013868	Yersinia pestis	Black Death	yes
+49.24211	91.29886	H1N1	Spanish Flu	yes
+50.97463	126.89123	H2N2	Asian Flu	yes
+17.651873	131.04713	H3N2	Hong Kong Flu	yes
+17.16801	82.57734	SARS-CoV-2	COVID-19	yes
+42.651203	-55.713978	MERS-CoV	MERS	no
+-100.421394	-10.561691	Yellow fever virus (YFV)	Yellow fever	no
+24.889101	43.706894	SARS-CoV	SARS	no
+-109.27112	-50.44441	Marburg virus (MARV)	Marburg virus disease	no
+56.264122	-28.415176	Lassa virus (LASV)	Lassa Fever	no
+-78.9593	-62.26207	Ebola virus (EBOV)	Ebola virus disease	no
+-10.683247	102.495056	Zika virus (ZIKV)	Zika virus infection	no
