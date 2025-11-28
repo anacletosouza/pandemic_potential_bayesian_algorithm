@@ -768,6 +768,14 @@ def run_analysis_with_fixed_features(base_dir_name):
         X_train, X_test, y_train, y_test = train_test_split(
             X_subset, y, test_size=0.3, random_state=42, stratify=y
         )
+        print("training selection")
+        print(X_train)
+        print("test selection")
+        print(X_test)
+        print("training pandemic/non-pandemic selection")
+        print(y_train)
+        print("test pandemic/non-pandemic selection")
+        print(y_test)        
         
         # Check if we have both classes in train and test
         if len(np.unique(y_train)) < 2 or len(np.unique(y_test)) < 2:
