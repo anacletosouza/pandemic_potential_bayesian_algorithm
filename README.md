@@ -38,7 +38,7 @@ $$
 \text{NPPI} = \frac{1}{1 + \exp(-\xi)}
 $$
 
-onde:
+where:
 
 $$
 \xi = -0.23 + 0.89 \cdot R_0^{\min} - 0.13 \cdot \text{Infectious}^{\text{period (avg days)}} - 0.31 \cdot \text{Lethality rate} + 0.11 \cdot \text{Incubation period}^{\text{(days min)}}
