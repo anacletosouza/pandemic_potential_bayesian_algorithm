@@ -47,7 +47,7 @@ $$
 
 ## Performance
 
-- **Accuracy**: ~80% (training set) and 83% (test set)
+- **Accuracy**: ~83% (training set) and 100% (test set)
 - **ROC AUC**: 95% (training), 100% (test)
 - **Key Insight**: Longer incubation periods amplify risk, while high lethality constrains global spread
 
