@@ -1,4 +1,4 @@
-Forecasting Emerging Pandemic Risks Through Random-Walk Metropolis–Hastings Monte Carlo Simulations
+Prediction of Microorganism Pandemic Potential via Random-Walk Metropolis–Hastings Monte Carlo Simulations
 
 
 ## 🔗 Affiliations
