@@ -34,7 +34,16 @@ We propose that pandemic potential arises from a quantifiable interplay of intri
 
 ### NPPI Formula:
 
-NPPI = -0.07 + 0.93×R₀min - 0.21×InfectiousPeriod - 0.23×Lethality + 0.30×IncubationMin - 0.07×PermanentImmunity
+$$
+\text{NPPI} = \frac{1}{1 + \exp(-\xi)}
+$$
+
+onde:
+
+$$
+\xi = -0.23 + 0.89 \cdot R_0^{\min} - 0.13 \cdot \text{Infectious}^{\text{period (avg days)}} - 0.31 \cdot \text{Lethality rate} + 0.11 \cdot \text{Incubation period}^{\text{(days min)}}
+$$
+ 
 
 ## Performance
 
